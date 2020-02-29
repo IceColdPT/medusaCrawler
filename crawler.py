@@ -3,11 +3,12 @@ from bs4 import BeautifulSoup
 import json
 import re
 import os.path
+import random
 class Crawler:
     def __init__(self,page):
-        
+        self.current_target_index = 0
         self.currentUrl = page
-        self.jsonFile = os.path.join( "data",self.currentUrl.split("://")[1].strip("/")+".json")
+        self.jsonFile = os.path.join( "data",self.currentUrl.split("/")[2]+str(random.randint(10,1000))+".json")
         
         self.currentPageContent = None
 
@@ -16,7 +17,7 @@ class Crawler:
      
         self.httpResponse = requests.get(self.currentUrl)
         self.bs = BeautifulSoup(self.httpResponse.text)
-
+        self.TARGETFILE = "targets"
         self.HISTORYFILENAME = "already_visited"
         #self.raw_json = self.httpResponse.json()
         try:
@@ -35,7 +36,10 @@ class Crawler:
                 "titles": [],
                 "headers": [],
             }]
-        
+            with open(self.jsonFile,"w+") as f:
+                print("saving json..")
+                json.dump(self.data,f)
+                f.close()
         
   
 
@@ -53,8 +57,13 @@ class Crawler:
     def getLinks(self):
     
         for a in self.bs.find_all("a" ,href=True):
-            self.data[0]["links"].append(a["href"])
+           with open("targets","a+") as f:
+               link = a["href"]
+               if link.startswith("htt"):
+                   self.data[0]["links"].append(link)
+                   f.write(link+"\n")
         self.saveJson(self.data)
+
       
         
     
@@ -71,12 +80,14 @@ class Crawler:
     def getEmailAddresses(self):
         result = []
         for line in self.bs.find_all():
+            
             extracted = self.__extractEmail(line.text)
+            print(extracted)
             if len(extracted) > 0:
                 result.append(extracted)
 
         if len(result) > 0:
-            self.data["email"].append(result)
+            self.data[0]["emails"].append(result)
             self.saveJson(self.data)
         else:
             print(self.currentUrl+" No email founds on this site.")
@@ -85,20 +96,48 @@ class Crawler:
     def history_addCurrentURL(self):
         with open(self.HISTORYFILENAME,"a+") as f:
             f.write(self.currentUrl+"\n")
-    
+
+    def history_getHistory(self,url):
+        f = open(self.HISTORYFILENAME,"r+")
+        for line in f.readlines():
+            if line == url:
+                return True
+            else:
+                return False
+
+    def chose_target(self):
+        with open(self.TARGETFILE,"r+") as f:
+            lines = f.readlines()
+            self.currentUrl = lines[self.current_target_index]
+            self.httpResponse = requests.get(self.currentUrl)
+            self.bs = BeautifulSoup(self.httpResponse.text)
+            self.jsonFile = os.path.join( "data",self.currentUrl.split("/")[2]+str(random.randint(10,1000))+".json")
+            f.close()
+
     def crawl(self,depth):
         active = True
 
         while active:
             #main loop!
+            self.current_target_index += 1
             print("===CURRENT URL: ("+self.currentUrl+")=====")
             #modos operandi:
             #
-
+   
+            print("Getting articles...")
+            self.getArticles()
+            print("getting emails...")
+            self.getEmailAddresses()
+            print("Getting links")
+            self.getLinks()
+            print("done. switching website")
+            s
+            self.chose_target()
 
 
 #testiing
-s = Crawler("https://www.sapo.pt/")
+s = Crawler("https://www.estbarreiro.ips.pt/")
+s.crawl(3)
 
 
 
